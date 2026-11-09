@@ -1,2 +1,2 @@
 # PaletaPro
-Solución tecnológica para la pelota paleta
+Plataforma digital integral para la pelota paleta argentina.

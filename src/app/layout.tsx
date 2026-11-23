@@ -1,5 +1,7 @@
+
 import type { Metadata } from "next";
 import "./globals.css";
+import MainNav from "../components/MainNav";
 
 export const metadata: Metadata = {
   title: "PaletaPro | Pelota Paleta Argentina",
@@ -14,7 +16,10 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="es">
-      <body>{children}</body>
+      <body>
+        <MainNav />
+        {children}
+      </body>
     </html>
   );
 }

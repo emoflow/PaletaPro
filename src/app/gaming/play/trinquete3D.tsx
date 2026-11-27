@@ -11,6 +11,7 @@ export default function Trinquete3D() {
   const [playerScore, setPlayerScore] = useState(0);
   const [rivalScore, setRivalScore] = useState(0);
   const [pointMessage, setPointMessage] = useState("¡A jugar!");
+  const [staminaUI, setStaminaUI] = useState(100);
 
   const controls = useRef({
     left: false,
@@ -222,6 +223,11 @@ export default function Trinquete3D() {
     let animationFrameId = 0;
     let floorBounces = 0;
 
+    // SISTEMA DE RESISTENCIA
+    let stamina = 100;
+    let staminaUpdateTimer = 0;
+    let breathingTime = 0;
+
     const clock = new THREE.Clock();
 
     const playerHitPosition = new THREE.Vector3();
@@ -269,7 +275,9 @@ export default function Trinquete3D() {
       if (controls.current.left) direction -= 1;
       if (controls.current.right) direction += 1;
 
-      const targetSpeed = direction * 5;
+      // VELOCIDAD SEGÚN LA ENERGÍA
+      const energyFactor = 0.55 + (stamina / 100) * 0.45;
+      const targetSpeed = direction * 5 * energyFactor;
 
       const difference =
         targetSpeed - player.userData.speed;
@@ -288,6 +296,39 @@ export default function Trinquete3D() {
 
       player.rotation.y =
         -player.userData.speed * 0.025;
+
+      // CONSUMO Y RECUPERACIÓN DE ENERGÍA
+      if (direction !== 0) {
+        stamina -= 8 * delta;
+      } else {
+        stamina += 7 * delta;
+      }
+
+      stamina = THREE.MathUtils.clamp(stamina, 0, 100);
+
+      // PEQUEÑA ANIMACIÓN DE RESPIRACIÓN
+      breathingTime += delta * (
+        stamina < 25 ? 5 :
+        stamina < 55 ? 3.5 : 2
+      );
+
+      const breathingIntensity =
+        stamina < 25 ? 0.045 :
+        stamina < 55 ? 0.025 : 0.012;
+
+      const breathing = Math.sin(breathingTime) *
+        breathingIntensity;
+
+      body.scale.x = 1 + breathing;
+      body.scale.z = 1 + breathing;
+
+      // ACTUALIZAR BARRA SIN REDIBUJAR EN CADA FRAME
+      staminaUpdateTimer += delta;
+
+      if (staminaUpdateTimer >= 0.12) {
+        setStaminaUI(Math.round(stamina));
+        staminaUpdateTimer = 0;
+      }
 
       // MOVIMIENTO DE LA PELOTA
       ball.position.x += velocity.x * delta;
@@ -368,6 +409,9 @@ export default function Trinquete3D() {
 
         hitCooldown = 0.6;
         floorBounces = 0;
+
+        // GOLPEAR TAMBIÉN CONSUME ENERGÍA
+        stamina = Math.max(0, stamina - 3.5);
 
         racket.rotation.x = -0.9;
       } else {
@@ -550,6 +594,22 @@ export default function Trinquete3D() {
     controls.current[control] = value;
   }
 
+  const staminaColor =
+    staminaUI > 55
+      ? "#b7e36b"
+      : staminaUI > 25
+      ? "#e9bd55"
+      : "#ed6555";
+
+  const staminaMessage =
+    staminaUI > 70
+      ? "EN BUEN ESTADO"
+      : staminaUI > 40
+      ? "CANSANCIO MODERADO"
+      : staminaUI > 15
+      ? "FATIGADO"
+      : "AGOTADO";
+
   const buttonStyle: CSSProperties = {
     padding: "17px 22px",
     borderRadius: 12,
@@ -613,6 +673,72 @@ export default function Trinquete3D() {
             {rivalScore}
           </strong>
         </div>
+      </div>
+
+      {/* RESISTENCIA FÍSICA */}
+      <div
+        style={{
+          background: "#202b20",
+          padding: 12,
+          borderRadius: 12,
+          marginBottom: 12,
+          color: "white",
+        }}
+      >
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            marginBottom: 8,
+            gap: 8,
+          }}
+        >
+          <strong style={{ fontSize: 13 }}>
+            RESISTENCIA FÍSICA
+          </strong>
+
+          <span
+            style={{
+              color: staminaColor,
+              fontSize: 12,
+              fontWeight: 800,
+            }}
+          >
+            {staminaMessage} · {staminaUI}%
+          </span>
+        </div>
+
+        <div
+          style={{
+            height: 12,
+            width: "100%",
+            background: "#111a13",
+            borderRadius: 20,
+            overflow: "hidden",
+          }}
+        >
+          <div
+            style={{
+              height: "100%",
+              width: `${staminaUI}%`,
+              background: staminaColor,
+              borderRadius: 20,
+              transition: "width 0.15s linear, background 0.2s",
+            }}
+          />
+        </div>
+
+        <p
+          style={{
+            color: "#aab5a8",
+            fontSize: 11,
+            margin: "7px 0 0",
+          }}
+        >
+          Correr y golpear consume energía. Quedarte quieto
+          permite recuperarla.
+        </p>
       </div>
 
       {/* CANCHA 3D */}
@@ -687,5 +813,5 @@ export default function Trinquete3D() {
       </p>
     </div>
   );
-      }
-      
+    }
+    

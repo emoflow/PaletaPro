@@ -1,11 +1,16 @@
 
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
+import type { CSSProperties } from "react";
 import * as THREE from "three";
 
 export default function Trinquete3D() {
   const containerRef = useRef<HTMLDivElement>(null);
+
+  const [playerScore, setPlayerScore] = useState(0);
+  const [rivalScore, setRivalScore] = useState(0);
+  const [pointMessage, setPointMessage] = useState("¡A jugar!");
 
   const controls = useRef({
     left: false,
@@ -30,7 +35,7 @@ export default function Trinquete3D() {
       100
     );
 
-    // RENDERIZADO
+    // RENDERIZADOR
     const renderer = new THREE.WebGLRenderer({
       antialias: true,
     });
@@ -208,19 +213,51 @@ export default function Trinquete3D() {
     scene.add(ball);
 
     // FÍSICA
-    const velocity = new THREE.Vector3(0.8, 0, 3);
+    const velocity = new THREE.Vector3(0.8, 2, -6);
+
     const gravity = 9.8;
 
     let hitCooldown = 0;
     let rivalHitCooldown = 0;
     let animationFrameId = 0;
+    let floorBounces = 0;
 
     const clock = new THREE.Clock();
 
     const playerHitPosition = new THREE.Vector3();
     const rivalHitPosition = new THREE.Vector3();
 
-    // ANIMACIÓN PRINCIPAL
+    // REINICIAR JUGADA
+    function resetRally() {
+      ball.position.set(0, 2, 1);
+      velocity.set(0.8, 2, -6);
+
+      floorBounces = 0;
+      hitCooldown = 0;
+      rivalHitCooldown = 0;
+
+      player.position.set(0, 0, 5);
+      rival.position.set(0, 0, -8);
+
+      player.userData.speed = 0;
+
+      controls.current.hit = false;
+    }
+
+    // PUNTO
+    function awardPoint(winner: "player" | "rival") {
+      if (winner === "player") {
+        setPlayerScore((score) => score + 1);
+        setPointMessage("¡PUNTO PARA VOS!");
+      } else {
+        setRivalScore((score) => score + 1);
+        setPointMessage("¡PUNTO PARA LA MÁQUINA!");
+      }
+
+      resetRally();
+    }
+
+    // ANIMACIÓN
     function animate() {
       animationFrameId = requestAnimationFrame(animate);
 
@@ -260,12 +297,20 @@ export default function Trinquete3D() {
       velocity.y -= gravity * delta;
 
       // REBOTE EN EL PISO
-      if (ball.position.y < 0.16) {
+      if (ball.position.y < 0.16 && velocity.y < 0) {
         ball.position.y = 0.16;
+
         velocity.y = Math.abs(velocity.y) * 0.72;
 
-        if (Math.abs(velocity.y) < 1) {
-          velocity.y = 0;
+        floorBounces += 1;
+
+        // DOS REBOTES: SE TERMINA LA JUGADA
+        if (floorBounces >= 2) {
+          if (ball.position.z < -1) {
+            awardPoint("player");
+          } else {
+            awardPoint("rival");
+          }
         }
       }
 
@@ -322,6 +367,8 @@ export default function Trinquete3D() {
         velocity.z = -8;
 
         hitCooldown = 0.6;
+        floorBounces = 0;
+
         racket.rotation.x = -0.9;
       } else {
         racket.rotation.x = THREE.MathUtils.lerp(
@@ -331,7 +378,7 @@ export default function Trinquete3D() {
         );
       }
 
-      // IA: EL RIVAL BUSCA LA PELOTA
+      // IA: BUSCAR LA PELOTA
       const rivalTarget = THREE.MathUtils.clamp(
         ball.position.x,
         -4,
@@ -345,7 +392,7 @@ export default function Trinquete3D() {
         delta
       );
 
-      // IA: EL RIVAL DEVUELVE LA PELOTA
+      // IA: DEVOLVER LA PELOTA
       rivalHitCooldown = Math.max(
         0,
         rivalHitCooldown - delta
@@ -361,22 +408,21 @@ export default function Trinquete3D() {
         ball.position.distanceTo(rivalHitPosition);
 
       if (
-        rivalDistance < 1.9 &&
+        rivalDistance < 2.5 &&
         velocity.z < 0 &&
         rivalHitCooldown === 0
       ) {
-        // DIRECCIÓN DE LA DEVOLUCIÓN
         velocity.x = THREE.MathUtils.clamp(
           (player.position.x - ball.position.x) * 1.4,
           -4,
           4
         );
 
-        // FUERZA DEL GOLPE
         velocity.y = 4.5;
         velocity.z = 7.5;
 
         rivalHitCooldown = 1.2;
+        floorBounces = 0;
       }
 
       // CÁMARA DETRÁS DEL JUGADOR
@@ -445,7 +491,7 @@ export default function Trinquete3D() {
     window.addEventListener("keydown", keyDown);
     window.addEventListener("keyup", keyUp);
 
-    // TAMAÑO RESPONSIVE
+    // RESPONSIVE
     function resize() {
       if (!container.clientHeight) return;
 
@@ -462,10 +508,10 @@ export default function Trinquete3D() {
 
     window.addEventListener("resize", resize);
 
-    // INICIAR JUEGO
+    // INICIAR
     animate();
 
-    // LIMPIEZA AL SALIR
+    // LIMPIEZA
     return () => {
       cancelAnimationFrame(animationFrameId);
 
@@ -504,7 +550,7 @@ export default function Trinquete3D() {
     controls.current[control] = value;
   }
 
-  const buttonStyle: React.CSSProperties = {
+  const buttonStyle: CSSProperties = {
     padding: "17px 22px",
     borderRadius: 12,
     border: "1px solid #536b35",
@@ -518,6 +564,58 @@ export default function Trinquete3D() {
 
   return (
     <div>
+      {/* MARCADOR */}
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          background: "#202b20",
+          padding: 14,
+          borderRadius: 12,
+          marginBottom: 12,
+          color: "white",
+          gap: 8,
+        }}
+      >
+        <div>
+          <div style={{ color: "#b7e36b", fontSize: 12 }}>
+            JUGADOR
+          </div>
+
+          <strong style={{ fontSize: 30 }}>
+            {playerScore}
+          </strong>
+        </div>
+
+        <div style={{ textAlign: "center" }}>
+          <div style={{ fontWeight: 800 }}>
+            MARCADOR
+          </div>
+
+          <div
+            style={{
+              color: "#b7e36b",
+              fontSize: 12,
+              marginTop: 4,
+            }}
+          >
+            {pointMessage}
+          </div>
+        </div>
+
+        <div style={{ textAlign: "right" }}>
+          <div style={{ color: "#d9e0e5", fontSize: 12 }}>
+            MÁQUINA
+          </div>
+
+          <strong style={{ fontSize: 30 }}>
+            {rivalScore}
+          </strong>
+        </div>
+      </div>
+
+      {/* CANCHA 3D */}
       <div
         ref={containerRef}
         style={{
@@ -530,6 +628,7 @@ export default function Trinquete3D() {
         }}
       />
 
+      {/* BOTONES */}
       <div
         style={{
           display: "flex",
@@ -583,10 +682,10 @@ export default function Trinquete3D() {
           marginTop: 12,
         }}
       >
-        Movete con las flechas o los botones.
-        Golpeá cuando la pelota esté cerca.
-        En computadora también podés usar A, D y espacio.
+        Movete con los botones. Golpeá cuando la pelota
+        esté cerca. En computadora podés usar A, D y espacio.
       </p>
     </div>
   );
       }
+      

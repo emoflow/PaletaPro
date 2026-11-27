@@ -17,10 +17,12 @@ export default function Trinquete3D() {
     const container = containerRef.current;
     if (!container) return;
 
+    // ESCENA
     const scene = new THREE.Scene();
     scene.background = new THREE.Color("#17251e");
     scene.fog = new THREE.Fog("#17251e", 25, 45);
 
+    // CÁMARA
     const camera = new THREE.PerspectiveCamera(
       65,
       container.clientWidth / container.clientHeight,
@@ -28,14 +30,23 @@ export default function Trinquete3D() {
       100
     );
 
+    // RENDERIZADO
     const renderer = new THREE.WebGLRenderer({
       antialias: true,
     });
 
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
-    renderer.setSize(container.clientWidth, container.clientHeight);
+    renderer.setPixelRatio(
+      Math.min(window.devicePixelRatio, 1.5)
+    );
+
+    renderer.setSize(
+      container.clientWidth,
+      container.clientHeight
+    );
+
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
     container.appendChild(renderer.domElement);
 
     // ILUMINACIÓN
@@ -61,6 +72,7 @@ export default function Trinquete3D() {
     floor.receiveShadow = true;
     scene.add(floor);
 
+    // PAREDES
     const wallMaterial = new THREE.MeshStandardMaterial({
       color: "#365c43",
       roughness: 0.8,
@@ -78,6 +90,7 @@ export default function Trinquete3D() {
         new THREE.BoxGeometry(w, h, d),
         wallMaterial
       );
+
       mesh.position.set(x, y, z);
       mesh.receiveShadow = true;
       scene.add(mesh);
@@ -87,16 +100,22 @@ export default function Trinquete3D() {
     wall(5.5, 2.5, -1, 0.3, 5, 22);
     wall(0, 2.5, -12, 11, 5, 0.35);
 
-    // LÍNEAS
+    // LÍNEAS DE CANCHA
     const lineMaterial = new THREE.MeshBasicMaterial({
       color: "#eee6c9",
     });
 
-    function line(x: number, z: number, w: number, d: number) {
+    function line(
+      x: number,
+      z: number,
+      w: number,
+      d: number
+    ) {
       const mesh = new THREE.Mesh(
         new THREE.BoxGeometry(w, 0.025, d),
         lineMaterial
       );
+
       mesh.position.set(x, 0.025, z);
       scene.add(mesh);
     }
@@ -112,28 +131,39 @@ export default function Trinquete3D() {
 
     const body = new THREE.Mesh(
       new THREE.CapsuleGeometry(0.42, 0.9, 6, 12),
-      new THREE.MeshStandardMaterial({ color: "#b7e36b" })
+      new THREE.MeshStandardMaterial({
+        color: "#b7e36b",
+      })
     );
+
     body.position.y = 1.25;
     body.castShadow = true;
     player.add(body);
 
     const head = new THREE.Mesh(
       new THREE.SphereGeometry(0.27, 24, 24),
-      new THREE.MeshStandardMaterial({ color: "#d6a17d" })
+      new THREE.MeshStandardMaterial({
+        color: "#d6a17d",
+      })
     );
+
     head.position.y = 2.05;
     player.add(head);
 
     const racket = new THREE.Mesh(
       new THREE.BoxGeometry(0.12, 0.65, 0.08),
-      new THREE.MeshStandardMaterial({ color: "#d5b17a" })
+      new THREE.MeshStandardMaterial({
+        color: "#d5b17a",
+      })
     );
+
     racket.position.set(0.55, 1.3, -0.15);
     racket.rotation.z = -0.4;
     player.add(racket);
 
     player.position.set(0, 0, 5);
+    player.userData.speed = 0;
+
     scene.add(player);
 
     // RIVAL
@@ -141,15 +171,21 @@ export default function Trinquete3D() {
 
     const rivalBody = new THREE.Mesh(
       new THREE.CapsuleGeometry(0.38, 0.85, 6, 12),
-      new THREE.MeshStandardMaterial({ color: "#d9e0e5" })
+      new THREE.MeshStandardMaterial({
+        color: "#d9e0e5",
+      })
     );
+
     rivalBody.position.y = 1.2;
     rival.add(rivalBody);
 
     const rivalHead = new THREE.Mesh(
       new THREE.SphereGeometry(0.25, 24, 24),
-      new THREE.MeshStandardMaterial({ color: "#d6a17d" })
+      new THREE.MeshStandardMaterial({
+        color: "#d6a17d",
+      })
     );
+
     rivalHead.position.y = 1.95;
     rival.add(rivalHead);
 
@@ -166,20 +202,27 @@ export default function Trinquete3D() {
         emissiveIntensity: 0.25,
       })
     );
+
     ball.position.set(0, 2, 1);
     ball.castShadow = true;
     scene.add(ball);
 
-    // FÍSICA INICIAL
+    // FÍSICA
     const velocity = new THREE.Vector3(0.8, 0, 3);
     const gravity = 9.8;
+
     let hitCooldown = 0;
-    let lastTime = 0;
+    let rivalHitCooldown = 0;
+    let animationFrameId = 0;
 
     const clock = new THREE.Clock();
 
+    const playerHitPosition = new THREE.Vector3();
+    const rivalHitPosition = new THREE.Vector3();
+
+    // ANIMACIÓN PRINCIPAL
     function animate() {
-      requestAnimationFrame(animate);
+      animationFrameId = requestAnimationFrame(animate);
 
       const delta = Math.min(clock.getDelta(), 0.033);
 
@@ -190,19 +233,26 @@ export default function Trinquete3D() {
       if (controls.current.right) direction += 1;
 
       const targetSpeed = direction * 5;
-      const difference = targetSpeed - player.userData.speed;
-      player.userData.speed += difference * Math.min(1, delta * 8);
 
-      player.position.x += player.userData.speed * delta;
+      const difference =
+        targetSpeed - player.userData.speed;
+
+      player.userData.speed +=
+        difference * Math.min(1, delta * 8);
+
+      player.position.x +=
+        player.userData.speed * delta;
+
       player.position.x = THREE.MathUtils.clamp(
         player.position.x,
         -4.5,
         4.5
       );
 
-      player.rotation.y = -player.userData.speed * 0.025;
+      player.rotation.y =
+        -player.userData.speed * 0.025;
 
-      // PELOTA: GRAVEDAD Y MOVIMIENTO
+      // MOVIMIENTO DE LA PELOTA
       ball.position.x += velocity.x * delta;
       ball.position.y += velocity.y * delta;
       ball.position.z += velocity.z * delta;
@@ -220,12 +270,16 @@ export default function Trinquete3D() {
       }
 
       // REBOTES LATERALES
-      if (ball.position.x < -5 || ball.position.x > 5) {
+      if (
+        ball.position.x < -5 ||
+        ball.position.x > 5
+      ) {
         ball.position.x = THREE.MathUtils.clamp(
           ball.position.x,
           -5,
           5
         );
+
         velocity.x *= -0.85;
       }
 
@@ -235,7 +289,7 @@ export default function Trinquete3D() {
         velocity.z = Math.abs(velocity.z) * 0.85;
       }
 
-      // REBOTE EN LA PARED DEL FONDO
+      // PARED DEL FONDO
       if (ball.position.z > 9.5) {
         ball.position.z = 9.5;
         velocity.z = -Math.abs(velocity.z) * 0.85;
@@ -244,16 +298,26 @@ export default function Trinquete3D() {
       // GOLPE DEL JUGADOR
       hitCooldown = Math.max(0, hitCooldown - delta);
 
-      const distance = ball.position.distanceTo(
-        new THREE.Vector3(
-          player.position.x,
-          1.4,
-          player.position.z - 0.5
-        )
+      playerHitPosition.set(
+        player.position.x,
+        1.4,
+        player.position.z - 0.5
       );
 
-      if (controls.current.hit && distance < 2.2 && hitCooldown === 0) {
-        velocity.x = (ball.position.x - player.position.x) * 2;
+      const playerDistance =
+        ball.position.distanceTo(playerHitPosition);
+
+      if (
+        controls.current.hit &&
+        playerDistance < 2.2 &&
+        hitCooldown === 0
+      ) {
+        velocity.x = THREE.MathUtils.clamp(
+          (ball.position.x - player.position.x) * 2,
+          -5,
+          5
+        );
+
         velocity.y = 5.5;
         velocity.z = -8;
 
@@ -267,19 +331,60 @@ export default function Trinquete3D() {
         );
       }
 
-      // IA: SE DESPLAZA HACIA LA PELOTA
+      // IA: EL RIVAL BUSCA LA PELOTA
       const rivalTarget = THREE.MathUtils.clamp(
         ball.position.x,
         -4,
         4
       );
 
-      rival.position.x +=
-        (rivalTarget - rival.position.x) * delta * 1.5;
+      rival.position.x = THREE.MathUtils.damp(
+        rival.position.x,
+        rivalTarget,
+        3,
+        delta
+      );
+
+      // IA: EL RIVAL DEVUELVE LA PELOTA
+      rivalHitCooldown = Math.max(
+        0,
+        rivalHitCooldown - delta
+      );
+
+      rivalHitPosition.set(
+        rival.position.x,
+        1.3,
+        rival.position.z
+      );
+
+      const rivalDistance =
+        ball.position.distanceTo(rivalHitPosition);
+
+      if (
+        rivalDistance < 1.9 &&
+        velocity.z < 0 &&
+        rivalHitCooldown === 0
+      ) {
+        // DIRECCIÓN DE LA DEVOLUCIÓN
+        velocity.x = THREE.MathUtils.clamp(
+          (player.position.x - ball.position.x) * 1.4,
+          -4,
+          4
+        );
+
+        // FUERZA DEL GOLPE
+        velocity.y = 4.5;
+        velocity.z = 7.5;
+
+        rivalHitCooldown = 1.2;
+      }
 
       // CÁMARA DETRÁS DEL JUGADOR
       camera.position.x +=
-        (player.position.x * 0.35 - camera.position.x) * delta * 4;
+        (
+          player.position.x * 0.35 -
+          camera.position.x
+        ) * delta * 4;
 
       camera.position.setY(4.2);
       camera.position.z = 9;
@@ -293,16 +398,24 @@ export default function Trinquete3D() {
       renderer.render(scene, camera);
     }
 
-    player.userData.speed = 0;
-
     // TECLADO
     function keyDown(e: KeyboardEvent) {
-      if (e.key === "ArrowLeft" || e.key.toLowerCase() === "a") {
+      if (
+        e.key === "ArrowLeft" ||
+        e.key.toLowerCase() === "a"
+      ) {
         controls.current.left = true;
+        e.preventDefault();
       }
-      if (e.key === "ArrowRight" || e.key.toLowerCase() === "d") {
+
+      if (
+        e.key === "ArrowRight" ||
+        e.key.toLowerCase() === "d"
+      ) {
         controls.current.right = true;
+        e.preventDefault();
       }
+
       if (e.code === "Space") {
         controls.current.hit = true;
         e.preventDefault();
@@ -310,13 +423,23 @@ export default function Trinquete3D() {
     }
 
     function keyUp(e: KeyboardEvent) {
-      if (e.key === "ArrowLeft" || e.key.toLowerCase() === "a") {
+      if (
+        e.key === "ArrowLeft" ||
+        e.key.toLowerCase() === "a"
+      ) {
         controls.current.left = false;
       }
-      if (e.key === "ArrowRight" || e.key.toLowerCase() === "d") {
+
+      if (
+        e.key === "ArrowRight" ||
+        e.key.toLowerCase() === "d"
+      ) {
         controls.current.right = false;
       }
-      if (e.code === "Space") controls.current.hit = false;
+
+      if (e.code === "Space") {
+        controls.current.hit = false;
+      }
     }
 
     window.addEventListener("keydown", keyDown);
@@ -324,27 +447,47 @@ export default function Trinquete3D() {
 
     // TAMAÑO RESPONSIVE
     function resize() {
-      camera.aspect = container.clientWidth / container.clientHeight;
+      if (!container.clientHeight) return;
+
+      camera.aspect =
+        container.clientWidth / container.clientHeight;
+
       camera.updateProjectionMatrix();
-      renderer.setSize(container.clientWidth, container.clientHeight);
+
+      renderer.setSize(
+        container.clientWidth,
+        container.clientHeight
+      );
     }
 
     window.addEventListener("resize", resize);
 
+    // INICIAR JUEGO
     animate();
 
+    // LIMPIEZA AL SALIR
     return () => {
+      cancelAnimationFrame(animationFrameId);
+
       window.removeEventListener("keydown", keyDown);
       window.removeEventListener("keyup", keyUp);
       window.removeEventListener("resize", resize);
 
+      controls.current.left = false;
+      controls.current.right = false;
+      controls.current.hit = false;
+
       scene.traverse((object) => {
         if (object instanceof THREE.Mesh) {
           object.geometry.dispose();
+
           const materials = Array.isArray(object.material)
             ? object.material
             : [object.material];
-          materials.forEach((material) => material.dispose());
+
+          materials.forEach((material) => {
+            material.dispose();
+          });
         }
       });
 
@@ -353,7 +496,11 @@ export default function Trinquete3D() {
     };
   }, []);
 
-  function hold(control: "left" | "right" | "hit", value: boolean) {
+  // CONTROLES TÁCTILES
+  function hold(
+    control: "left" | "right" | "hit",
+    value: boolean
+  ) {
     controls.current[control] = value;
   }
 
@@ -429,11 +576,17 @@ export default function Trinquete3D() {
         </button>
       </div>
 
-      <p style={{ color: "#aab5a8", fontSize: 13, marginTop: 12 }}>
-        Movete con las flechas o los botones. Golpeá cuando la pelota
-        esté cerca. En computadora también podés usar A, D y espacio.
+      <p
+        style={{
+          color: "#aab5a8",
+          fontSize: 13,
+          marginTop: 12,
+        }}
+      >
+        Movete con las flechas o los botones.
+        Golpeá cuando la pelota esté cerca.
+        En computadora también podés usar A, D y espacio.
       </p>
     </div>
   );
-    }
-      
+      }
